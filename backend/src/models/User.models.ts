@@ -1,9 +1,9 @@
-import { PassWord } from './../config/env';
 import sequelize from "../config/database";
 import { DataType, DataTypes } from "sequelize";
-const User =  sequelize.define('User',{
+
+export const User =  sequelize.define('User',{
 id:{
-    type:DataTypes.STRING,
+    type:DataTypes.INTEGER,
     primaryKey:true,
     autoIncrement:true
 },
@@ -23,5 +23,12 @@ passwordHash:{
 role:{
     type:DataTypes.ENUM('CLIENT','AGENT'),
     allowNull:false,
+},
+is_online:{
+    type:DataTypes.BOOLEAN,
+    allowNull:false
 }
+},
+{
+    createdAt:true,
 })

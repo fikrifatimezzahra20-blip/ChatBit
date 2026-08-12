@@ -3,7 +3,8 @@ import sequelize from './config/database'
 async function testdatabase(){
 try{
         sequelize.authenticate()
-}catch{
+}
+catch{
 console.error("")
 }
 }

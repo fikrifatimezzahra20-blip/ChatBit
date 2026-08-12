@@ -1,38 +1,35 @@
 import sequelize from "../config/database";
 import { DataType, DataTypes } from "sequelize";
 
-export const Conversation =  sequelize.define('Conversation',{
+export const Message =  sequelize.define('Message',{
 id:{
     type:DataTypes.INTEGER,
     primaryKey:true,
     autoIncrement:true,
     allowNull:false
 },
-subject:{
+convrsation_id:{
     type:DataTypes.INTEGER,
     allowNull:false,
 },
-status:{
+sender_id:{
     type:DataTypes.INTEGER,
     unique:true,
     allowNull:false
 },
-client_id:{
+content:{
     type:DataTypes.STRING,
     allowNull:false,
 },
-agent_id:{
+is_read:{
     type:DataTypes.BOOLEAN,
     allowNull:false,
 },
-created_at:{
+sent_at:{
     type:DataTypes.DATE,
-    allowNull:true
-
-},
-closed_at:{
-    type:DataTypes.DATE,
-    allowNull:true
+    allowNull:false,
 }
 
 })
+
+
