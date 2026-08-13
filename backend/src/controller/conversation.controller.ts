@@ -1,3 +1,8 @@
-import { Message } from "../models/Message.models";
-import { User } from "../models/User.models";
-import { Conversation } from "../models/Conversation.models";
+import { getAll, create, getMessages, close } from "./conversation";
+
+export default {
+    getAll,
+    create,
+    getMessages,
+    close
+};
