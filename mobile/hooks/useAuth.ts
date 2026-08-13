@@ -1,12 +1,6 @@
 import { useEffect, useState } from "react";
 import { storage } from "../lib/storage";
-
-type User = {
-  id: number;
-  fullname: string;
-  email: string;
-  role: "client" | "agent";
-};
+import type { User } from "../types/user";
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);

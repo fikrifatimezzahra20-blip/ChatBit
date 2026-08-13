@@ -1,11 +1,12 @@
 import api from "./api";
 import { storage } from "../lib/storage";
+import type { User } from "../types/user";
 
 type RegisterData = {
   fullname: string;
   email: string;
   password: string;
-  role?: "client" | "agent";
+  role?: "CLIENT" | "AGENT";
 };
 
 type LoginData = {
@@ -19,36 +20,60 @@ type AuthResponse = {
     id: number;
     fullname: string;
     email: string;
-    role: "client" | "agent";
+    role: "CLIENT" | "AGENT";
+    is_online?: boolean;
+  };
+};
+
+const normalizeUser = (
+  user: AuthResponse["user"]
+): User => {
+  return {
+    ...user,
+    role: user.role.toLowerCase() as "client" | "agent",
   };
 };
 
 export const register = async (data: RegisterData) => {
   const response = await api.post<AuthResponse>(
     "/auth/register",
-    data
+    {
+      fullname: data.fullname,
+      email: data.email,
+      password: data.password,
+      role: data.role ?? "CLIENT",
+    }
   );
 
-  const { token, user } = response.data;
+  const user = normalizeUser(response.data.user);
 
-  await storage.setToken(token);
+  await storage.setToken(response.data.token);
   await storage.setUser(user);
 
-  return response.data;
+  return {
+    token: response.data.token,
+    user,
+  };
 };
 
 export const login = async (data: LoginData) => {
   const response = await api.post<AuthResponse>(
     "/auth/login",
-    data
+    {
+      email: data.email,
+      passwordHash: data.password,
+    }
   );
 
-  const { token, user } = response.data;
+  const user = normalizeUser(response.data.user);
 
-  await storage.setToken(token);
+  await storage.setToken(response.data.token);
   await storage.setUser(user);
 
-  return response.data;
+  return {
+    token: response.data.token,
+    user,
+  };
 };
 
 export const logout = async () => {
@@ -57,7 +82,13 @@ export const logout = async () => {
 };
 
 export const getMe = async () => {
-  const response = await api.get("/users/me");
+  const response = await api.get<AuthResponse["user"]>(
+    "/user/me"
+  );
 
-  return response.data;
+  const user = normalizeUser(response.data);
+
+  await storage.setUser(user);
+
+  return user;
 };

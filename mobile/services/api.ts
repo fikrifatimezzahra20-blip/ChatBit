@@ -1,9 +1,9 @@
-import {create} from "axios";
+import axios from "axios";
 import { storage } from "../lib/storage";
 
-const API_URL = "http://192.168.1.78:3000/api";
+const API_URL = "http://192.168.1.78:3001/api";
 
-const api = create({
+const api = axios.create({
   baseURL: API_URL,
   headers: {
     "Content-Type": "application/json",

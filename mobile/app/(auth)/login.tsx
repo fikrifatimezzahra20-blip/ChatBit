@@ -1,23 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-
-import {
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-} from "react-native";
-
-import { router } from "expo-router";
 import { useState } from "react";
-
-import ScreenBackground from "../../components/ScreenBackground";
+import { router } from "expo-router";
 import { login } from "../../services/auth.service";
+import { StyleSheet, Text, TextInput, TouchableOpacity, View, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator, } from "react-native";
+import ScreenBackground from "../../components/ScreenBackground";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -103,13 +89,12 @@ export default function Login() {
                 />
 
                 <TextInput
+                  value={email}
+                  onChangeText={setEmail}
                   placeholder="Email"
                   placeholderTextColor="#8A8FA8"
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  autoCorrect={false}
-                  value={email}
-                  onChangeText={setEmail}
                   style={styles.input}
                 />
               </View>
@@ -123,13 +108,11 @@ export default function Login() {
                 />
 
                 <TextInput
-                  placeholder="Password"
-                  placeholderTextColor="#8A8FA8"
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  autoCorrect={false}
                   value={password}
                   onChangeText={setPassword}
+                  placeholder="Password"
+                  placeholderTextColor="#8A8FA8"
+                  secureTextEntry
                   style={styles.input}
                 />
 
@@ -161,24 +144,43 @@ export default function Login() {
 
               {/* Login button */}
               <TouchableOpacity
-                style={[
-                  styles.loginButton,
-                  loading && styles.loginButtonDisabled,
-                ]}
+                style={styles.loginButton}
                 activeOpacity={0.85}
-                onPress={handleLogin}
                 disabled={loading}
+                onPress={async () => {
+                  if (!email.trim() || !password) {
+                    Alert.alert(
+                      "Missing information",
+                      "Please enter your email and password."
+                    );
+                    return;
+                  }
+
+                  try {
+                    setLoading(true);
+
+                    await login({
+                      email: email.trim(),
+                      password,
+                    });
+
+                    router.replace("/(app)/conversations");
+                  } catch (error: any) {
+                    console.log("LOGIN ERROR:", error?.response?.data);
+
+                    Alert.alert(
+                      "Login failed",
+                      error?.response?.data?.message ||
+                      "Unable to login. Please try again."
+                    );
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
               >
-                {loading ? (
-                  <ActivityIndicator
-                    size="small"
-                    color="#FFFFFF"
-                  />
-                ) : (
-                  <Text style={styles.loginButtonText}>
-                    Log In
-                  </Text>
-                )}
+                <Text style={styles.loginButtonText}>
+                  {loading ? "Logging in..." : "Log In"}
+                </Text>
               </TouchableOpacity>
 
               {/* Divider */}
