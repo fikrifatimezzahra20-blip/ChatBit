@@ -5,7 +5,8 @@ import { Response,Request } from "express";
 import bcrypt from 'bcrypt'
 import {User} from '../models/User.models'
 
-class  auth  {
+
+export default class  auth  {
     register  = async (req:Request,res:Response)=>{
         try{
             const {email , fullname ,passwordHash } =  req.body ;
@@ -16,12 +17,24 @@ class  auth  {
             const result =  await User.findOne({where:{
                 email
             }})
-            if(email){
+            if(result){
                return res.status(400).json({message:"field all required"})     
             }
-            const password = await bcrypt.hash('oussama',1233) 
+            const password = await bcrypt.hash(passwordHash,10)
+            // check password 
+            if(!password){
+                return console.log(password , "error")
+            } 
 
-            const db  =   User.create('User',)  
+              await User.create({
+                name:fullname,
+                email:email,
+                password:passwordHash
+            })
+            
+            
+            
+    
         }
         catch(err){
             console.error(err)
@@ -32,16 +45,18 @@ class  auth  {
         const {email , fullname} =  req.body ;
             if(!email || !fullname){
             res.status(404).json({message:'Not  Found'})
-        }
-        }
-        catch{
 
+        }
+        const result =  User.findOne({where:{email}})
+        }
+        catch(err){
+            return console.log(err)
         }
     }
 
     me  = async (req:Request,res:Response)=>{
         try{
-                    const {email , fullname} =  req.body ;
+        const {email , fullname} =  req.body ;
         if(email&&fullname ===  null){
             res.status(404).json({message:'Not  Found'})
         }
