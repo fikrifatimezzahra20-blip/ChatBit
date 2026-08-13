@@ -1,6 +1,4 @@
-import {
-  Ionicons
-} from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 
 import {
   StyleSheet,
@@ -11,13 +9,51 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 
 import { router } from "expo-router";
+import { useState } from "react";
 
 import ScreenBackground from "../../components/ScreenBackground";
+import { login } from "../../services/auth.service";
 
 export default function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      Alert.alert("Error", "Please enter your email and password.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      await login({
+        email: email.trim(),
+        password,
+      });
+
+      router.replace("/(app)/conversations");
+    } catch (error: any) {
+      console.log("Login error:", error);
+
+      const message =
+        error?.response?.data?.message ||
+        "Email or password is incorrect.";
+
+      Alert.alert("Login failed", message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <ScreenBackground type="auth">
       <KeyboardAvoidingView
@@ -71,6 +107,9 @@ export default function Login() {
                   placeholderTextColor="#8A8FA8"
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  autoCorrect={false}
+                  value={email}
+                  onChangeText={setEmail}
                   style={styles.input}
                 />
               </View>
@@ -86,13 +125,24 @@ export default function Login() {
                 <TextInput
                   placeholder="Password"
                   placeholderTextColor="#8A8FA8"
-                  secureTextEntry
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={password}
+                  onChangeText={setPassword}
                   style={styles.input}
                 />
 
-                <TouchableOpacity activeOpacity={0.7}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setShowPassword(!showPassword)}
+                >
                   <Ionicons
-                    name="eye-outline"
+                    name={
+                      showPassword
+                        ? "eye-off-outline"
+                        : "eye-outline"
+                    }
                     size={21}
                     color="#8A8FA8"
                   />
@@ -111,13 +161,24 @@ export default function Login() {
 
               {/* Login button */}
               <TouchableOpacity
-                style={styles.loginButton}
+                style={[
+                  styles.loginButton,
+                  loading && styles.loginButtonDisabled,
+                ]}
                 activeOpacity={0.85}
-                onPress={() => router.replace("/(app)/conversations")}
+                onPress={handleLogin}
+                disabled={loading}
               >
-                <Text style={styles.loginButtonText}>
-                  Log In
-                </Text>
+                {loading ? (
+                  <ActivityIndicator
+                    size="small"
+                    color="#FFFFFF"
+                  />
+                ) : (
+                  <Text style={styles.loginButtonText}>
+                    Log In
+                  </Text>
+                )}
               </TouchableOpacity>
 
               {/* Divider */}
@@ -138,7 +199,9 @@ export default function Login() {
                   style={styles.socialButton}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.googleText}>G</Text>
+                  <Text style={styles.googleText}>
+                    G
+                  </Text>
 
                   <Text style={styles.socialText}>
                     Google
@@ -169,7 +232,9 @@ export default function Login() {
                 </Text>
 
                 <TouchableOpacity
-                  onPress={() => router.push("/(auth)/register")}
+                  onPress={() =>
+                    router.push("/(auth)/register")
+                  }
                   activeOpacity={0.7}
                 >
                   <Text style={styles.registerLink}>
@@ -179,7 +244,6 @@ export default function Login() {
               </View>
 
             </View>
-
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -307,6 +371,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 6,
+  },
+
+  loginButtonDisabled: {
+    opacity: 0.7,
   },
 
   loginButtonText: {
