@@ -19,18 +19,17 @@ export default function Conversations() {
         <View style={styles.header}>
 
           {/* Profile */}
-          <TouchableOpacity
-            style={styles.profileButton}
-            activeOpacity={0.8}
-          >
-            <View style={styles.profileImage}>
-              <Ionicons
-                name="person"
-                size={22}
-                color="#8A6BE8"
-              />
-            </View>
-          </TouchableOpacity>
+        <TouchableOpacity
+        style={styles.profileButton}
+        onPress={() => router.push("/(app)/profile")}
+        activeOpacity={0.7}
+        >
+          <Ionicons
+            name="person-outline"
+            size={24}
+            color="#7C5CE6"
+          />
+        </TouchableOpacity>
 
           {/* Logo */}
           <Image

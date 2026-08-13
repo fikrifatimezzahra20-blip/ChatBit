@@ -2,7 +2,7 @@ import { ImageBackground, StyleSheet, View } from "react-native";
 
 const backgrounds = {
   auth: require("../assets/images/backgrounds/auth.jpg"),
-  welcome: require("../assets/images/backgrounds/welcome.jpg"),
+  welcome: require("../assets/images/backgrounds/welcom.jpg"),
   chat: require("../assets/images/backgrounds/chat.jpg"),
   profile: require("../assets/images/backgrounds/profile.png"),
 };

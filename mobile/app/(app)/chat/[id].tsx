@@ -1,13 +1,13 @@
-import {
-  Ionicons,
-} from "@expo/vector-icons";
-
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-
+import { router, useLocalSearchParams } from "expo-router";
+import React, { useRef, useState } from "react";
 import {
+  Alert,
   Image,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -17,35 +17,48 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import ScreenBackground from "../../../components/ScreenBackground";
-import PresenceIndicator from "../../../components/PresenceIndicator";
 
 type Message = {
   id: string;
   text?: string;
   image?: string;
   mine: boolean;
+  time: string;
 };
 
 export default function ChatScreen() {
-  const { id } = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
+
+  const params = useLocalSearchParams<{
+    id: string;
+    name?: string;
+    avatar?: string;
+    phone?: string;
+  }>();
+
+  const scrollRef = useRef<ScrollView>(null);
+
+  const contactName = params.name || "ChatBit Support";
+  const phoneNumber = params.phone || "";
 
   const [message, setMessage] = useState("");
 
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "Hey! How can I help you today? 👋",
+      text: "Hello! 👋 How can we help you today?",
       mine: false,
+      time: "10:30",
     },
   ]);
 
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
   // =========================
-  // SEND MESSAGE
+  // SEND TEXT MESSAGE
   // =========================
 
   const sendMessage = () => {
@@ -59,13 +72,18 @@ export default function ChatScreen() {
       id: Date.now().toString(),
       text,
       mine: true,
+      time: getCurrentTime(),
     };
 
-    setMessages((prev) => [...prev, newMessage]);
+    setMessages((previous) => [...previous, newMessage]);
 
     setMessage("");
 
-    Keyboard.dismiss();
+    setTimeout(() => {
+      scrollRef.current?.scrollToEnd({
+        animated: true,
+      });
+    }, 100);
   };
 
   // =========================
@@ -73,137 +91,244 @@ export default function ChatScreen() {
   // =========================
 
   const pickImage = async () => {
-    const permission =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    try {
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    if (!permission.granted) {
-      return;
-    }
+      if (!permission.granted) {
+        Alert.alert(
+          "Permission required",
+          "Please allow access to your photos."
+        );
 
-    const result =
-      await ImagePicker.launchImageLibraryAsync({
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
-
-        // مهم بزاف:
         allowsEditing: false,
-
-        // الصورة بالجودة الأصلية قدر الإمكان
         quality: 1,
-
-        // ما نحولوش الصورة
         base64: false,
-
-        // ما نقصوهاش
-        aspect: undefined,
       });
 
-    if (result.canceled) {
-      return;
+      if (result.canceled) {
+        return;
+      }
+
+      const uri = result.assets?.[0]?.uri;
+
+      if (!uri) {
+        return;
+      }
+
+      // الصورة غير كتدخل للـpreview
+      // ما كتترسلش مباشرة
+      setSelectedImage(uri);
+    } catch (error) {
+      console.log("Image picker error:", error);
+
+      Alert.alert(
+        "Error",
+        "Could not open your photo library."
+      );
     }
+  };
 
-    const selectedImage = result.assets[0];
+  // =========================
+  // SEND IMAGE
+  // =========================
 
-    if (!selectedImage?.uri) {
+  const sendImage = () => {
+    if (!selectedImage) {
       return;
     }
 
     const newMessage: Message = {
       id: Date.now().toString(),
-      image: selectedImage.uri,
+      image: selectedImage,
       mine: true,
+      time: getCurrentTime(),
     };
 
-    setMessages((prev) => [...prev, newMessage]);
+    setMessages((previous) => [...previous, newMessage]);
+
+    setSelectedImage(null);
+
+    setTimeout(() => {
+      scrollRef.current?.scrollToEnd({
+        animated: true,
+      });
+    }, 100);
+  };
+
+  // =========================
+  // CANCEL IMAGE
+  // =========================
+
+  const cancelImage = () => {
+    setSelectedImage(null);
+  };
+
+  // =========================
+  // PHONE CALL
+  // =========================
+
+  const makeCall = async () => {
+    if (!phoneNumber) {
+      Alert.alert(
+        "Call",
+        "No phone number is available for this contact."
+      );
+
+      return;
+    }
+
+    const url = `tel:${phoneNumber}`;
+
+    try {
+      const supported = await Linking.canOpenURL(url);
+
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert(
+          "Call unavailable",
+          "Your device cannot make phone calls."
+        );
+      }
+    } catch (error) {
+      console.log("Call error:", error);
+    }
+  };
+
+  // =========================
+  // VIDEO CALL
+  // =========================
+
+  const makeVideoCall = () => {
+    Alert.alert(
+      "Video call",
+      "Video calling will be connected later."
+    );
+  };
+
+  // =========================
+  // DISMISS KEYBOARD
+  // =========================
+
+  const dismissKeyboard = () => {
+    Keyboard.dismiss();
   };
 
   return (
-    <ScreenBackground type="welcome">
-
+    <ScreenBackground type="chat">
       <KeyboardAvoidingView
         style={styles.keyboard}
-        behavior={
-          Platform.OS === "ios"
-            ? "padding"
-            : undefined
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={
+          Platform.OS === "ios" ? 0 : 0
         }
       >
+        <View style={styles.container}>
 
-        <Pressable
-          style={styles.screen}
-          onPress={() => Keyboard.dismiss()}
-        >
+          {/* =====================================================
+              HEADER
+          ====================================================== */}
 
-          {/* ================= HEADER ================= */}
+          <View
+            style={[
+              styles.header,
+              {
+                paddingTop: insets.top,
+                height: 70 + insets.top,
+              },
+            ]}
+          >
 
-          <View style={styles.header}>
-
-            {/* Back */}
+            {/* BACK BUTTON */}
 
             <TouchableOpacity
-              style={styles.iconButton}
+              style={styles.headerButton}
               onPress={() => router.back()}
               activeOpacity={0.7}
             >
               <Ionicons
                 name="chevron-back"
-                size={25}
+                size={27}
                 color="#27345F"
               />
             </TouchableOpacity>
 
-            {/* Profile */}
+            {/* PROFILE + NAME */}
 
-            <View style={styles.profileContainer}>
+            <View style={styles.profileArea}>
 
-              <View style={styles.avatarContainer}>
+              <View style={styles.avatar}>
 
-                <Image
-                  source={{
-                    uri:
-                      "https://i.pravatar.cc/150?img=47",
-                  }}
-                  style={styles.avatar}
-                />
-
-                <View style={styles.onlineDot} />
+                {params.avatar ? (
+                  <Image
+                    source={{ uri: params.avatar }}
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <Ionicons
+                    name="person"
+                    size={23}
+                    color="#8A6BE8"
+                  />
+                )}
 
               </View>
 
-              <View style={styles.userInfo}>
+              <View style={styles.nameArea}>
 
-                <Text style={styles.userName}>
-                  Sarah Johnson
+                <Text
+                  style={styles.contactName}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {contactName}
                 </Text>
 
-                <PresenceIndicator online />
+                <View style={styles.onlineRow}>
+
+                  <View style={styles.onlineDot} />
+
+                  <Text style={styles.onlineText}>
+                    Online
+                  </Text>
+
+                </View>
 
               </View>
 
             </View>
 
-            {/* Header actions */}
+            {/* CALL + VIDEO */}
 
             <View style={styles.headerActions}>
 
               <TouchableOpacity
-                style={styles.headerIcon}
+                style={styles.actionButton}
+                onPress={makeCall}
                 activeOpacity={0.7}
               >
                 <Ionicons
                   name="call-outline"
-                  size={21}
-                  color="#8061D9"
+                  size={22}
+                  color="#7355C7"
                 />
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.headerIcon}
+                style={styles.actionButton}
+                onPress={makeVideoCall}
                 activeOpacity={0.7}
               >
                 <Ionicons
                   name="videocam-outline"
-                  size={22}
-                  color="#8061D9"
+                  size={23}
+                  color="#7355C7"
                 />
               </TouchableOpacity>
 
@@ -211,99 +336,147 @@ export default function ChatScreen() {
 
           </View>
 
-          {/* ================= MESSAGES ================= */}
+          {/* =====================================================
+              MESSAGES
+          ====================================================== */}
 
-          <ScrollView
-            style={styles.messages}
-            contentContainerStyle={styles.messagesContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+          <Pressable
+            style={styles.messagesArea}
+            onPress={dismissKeyboard}
           >
+            <ScrollView
+              ref={scrollRef}
+              style={styles.messages}
+              contentContainerStyle={styles.messagesContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
 
-            {messages.map((item) => (
-
-              <View
-                key={item.id}
-                style={[
-                  styles.messageRow,
-                  item.mine
-                    ? styles.myRow
-                    : styles.otherRow,
-                ]}
-              >
-
+              {messages.map((item) => (
                 <View
+                  key={item.id}
                   style={[
-                    styles.bubble,
+                    styles.messageRow,
                     item.mine
-                      ? styles.myBubble
-                      : styles.otherBubble,
+                      ? styles.myMessageRow
+                      : styles.theirMessageRow,
                   ]}
                 >
 
-                  {/* IMAGE */}
+                  <View
+                    style={[
+                      styles.bubble,
+                      item.mine
+                        ? styles.myBubble
+                        : styles.theirBubble,
+                    ]}
+                  >
 
-                  {item.image && (
-                    <Image
-                      source={{ uri: item.image }}
-                      style={styles.messageImage}
+                    {/* IMAGE */}
 
-                      // مهم:
-                      // الصورة كاملة بلا crop
-                      resizeMode="contain"
-                    />
-                  )}
+                    {item.image && (
+                      <Image
+                        source={{ uri: item.image }}
+                        style={styles.messageImage}
+                        resizeMode="contain"
+                      />
+                    )}
 
-                  {/* TEXT */}
+                    {/* TEXT */}
 
-                  {item.text && (
+                    {item.text && (
+                      <Text
+                        style={[
+                          styles.messageText,
+                          item.mine
+                            ? styles.myMessageText
+                            : styles.theirMessageText,
+                        ]}
+                      >
+                        {item.text}
+                      </Text>
+                    )}
+
+                    {/* TIME */}
+
                     <Text
                       style={[
-                        styles.messageText,
+                        styles.messageTime,
                         item.mine
-                          ? styles.myText
-                          : styles.otherText,
+                          ? styles.myMessageTime
+                          : styles.theirMessageTime,
                       ]}
                     >
-                      {item.text}
+                      {item.time}
                     </Text>
-                  )}
 
-                  {item.mine && (
-                    <View style={styles.messageMeta}>
-
-                      <Text style={styles.time}>
-                        {new Date().toLocaleTimeString(
-                          [],
-                          {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }
-                        )}
-                      </Text>
-
-                      <Ionicons
-                        name="checkmark-done"
-                        size={14}
-                        color="#7C8CF8"
-                      />
-
-                    </View>
-                  )}
+                  </View>
 
                 </View>
+              ))}
+
+            </ScrollView>
+          </Pressable>
+
+          {/* =====================================================
+              IMAGE PREVIEW
+          ====================================================== */}
+
+          {selectedImage && (
+            <View style={styles.previewContainer}>
+
+              <View style={styles.previewHeader}>
+
+                <Text style={styles.previewTitle}>
+                  Send image
+                </Text>
+
+                <TouchableOpacity
+                  onPress={cancelImage}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name="close-circle"
+                    size={28}
+                    color="#7355C7"
+                  />
+                </TouchableOpacity>
 
               </View>
 
-            ))}
+              <Image
+                source={{ uri: selectedImage }}
+                style={styles.previewImage}
+                resizeMode="contain"
+              />
 
-          </ScrollView>
+              <TouchableOpacity
+                style={styles.sendImageButton}
+                onPress={sendImage}
+                activeOpacity={0.85}
+              >
 
-          {/* ================= INPUT ================= */}
+                <Ionicons
+                  name="paper-plane"
+                  size={18}
+                  color="#FFFFFF"
+                />
 
-          <View style={styles.inputArea}>
+                <Text style={styles.sendImageText}>
+                  Send image
+                </Text>
 
-            <View style={styles.inputContainer}>
+              </TouchableOpacity>
+
+            </View>
+          )}
+
+          {/* =====================================================
+              MESSAGE INPUT
+          ====================================================== */}
+
+          {!selectedImage && (
+            <View style={styles.inputArea}>
 
               {/* IMAGE BUTTON */}
 
@@ -314,24 +487,26 @@ export default function ChatScreen() {
               >
                 <Ionicons
                   name="image-outline"
-                  size={23}
-                  color="#8061D9"
+                  size={24}
+                  color="#7355C7"
                 />
               </TouchableOpacity>
 
-              {/* INPUT */}
+              {/* TEXT INPUT */}
 
               <TextInput
+                style={styles.textInput}
                 value={message}
                 onChangeText={setMessage}
                 placeholder="Type a message..."
                 placeholderTextColor="#8992AA"
-                style={styles.input}
                 multiline
+                maxLength={1000}
                 returnKeyType="default"
+                blurOnSubmit={false}
               />
 
-              {/* SEND */}
+              {/* SEND BUTTON */}
 
               <TouchableOpacity
                 style={[
@@ -341,25 +516,38 @@ export default function ChatScreen() {
                 ]}
                 onPress={sendMessage}
                 activeOpacity={0.8}
+                disabled={!message.trim()}
               >
                 <Ionicons
-                  name="send"
-                  size={18}
+                  name="paper-plane"
+                  size={19}
                   color="#FFFFFF"
                 />
               </TouchableOpacity>
 
             </View>
+          )}
 
-          </View>
-
-        </Pressable>
-
+        </View>
       </KeyboardAvoidingView>
-
     </ScreenBackground>
   );
 }
+
+// ============================================================
+// TIME
+// ============================================================
+
+function getCurrentTime() {
+  return new Date().toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// ============================================================
+// STYLES
+// ============================================================
 
 const styles = StyleSheet.create({
 
@@ -367,136 +555,192 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  screen: {
+  container: {
     flex: 1,
   },
 
-  // =========================
+  // ==========================================================
   // HEADER
-  // =========================
+  // ==========================================================
 
   header: {
-    height: 78,
+    width: "100%",
+
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 18,
 
-    backgroundColor:
-      "rgba(255,255,255,0.72)",
+    paddingHorizontal: 12,
+
+    backgroundColor: "rgba(255,255,255,0.92)",
 
     borderBottomWidth: 1,
-    borderBottomColor:
-      "rgba(120,130,170,0.12)",
+    borderBottomColor: "rgba(120,130,170,0.15)",
+
+    shadowColor: "#5F6B99",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+
+    elevation: 3,
   },
 
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  headerButton: {
+    width: 42,
+    height: 42,
 
-    backgroundColor:
-      "rgba(255,255,255,0.8)",
+    borderRadius: 21,
 
     alignItems: "center",
     justifyContent: "center",
 
-    marginRight: 10,
+    backgroundColor: "rgba(255,255,255,0.80)",
+
+    flexShrink: 0,
   },
 
-  profileContainer: {
+  profileArea: {
     flex: 1,
+
+    minWidth: 0,
+
     flexDirection: "row",
     alignItems: "center",
-  },
 
-  avatarContainer: {
-    position: "relative",
+    marginLeft: 7,
+    marginRight: 6,
   },
 
   avatar: {
     width: 45,
     height: 45,
+
     borderRadius: 23,
-  },
 
-  onlineDot: {
-    position: "absolute",
-
-    width: 11,
-    height: 11,
-    borderRadius: 6,
-
-    backgroundColor: "#58D6B2",
-
-    right: 0,
-    bottom: 1,
-
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-  },
-
-  userInfo: {
-    marginLeft: 10,
-  },
-
-  userName: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#27345F",
-    marginBottom: 1,
-  },
-
-  headerActions: {
-    flexDirection: "row",
-    gap: 5,
-  },
-
-  headerIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    backgroundColor: "rgba(255,255,255,0.95)",
 
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor:
-      "rgba(255,255,255,0.65)",
+    borderWidth: 1.5,
+    borderColor: "rgba(138,107,232,0.25)",
+
+    overflow: "hidden",
+
+    flexShrink: 0,
   },
 
-  // =========================
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+
+  nameArea: {
+    flex: 1,
+
+    minWidth: 0,
+
+    marginLeft: 10,
+  },
+
+  contactName: {
+    fontSize: 16,
+    fontWeight: "700",
+
+    color: "#27345F",
+
+    maxWidth: "100%",
+  },
+
+  onlineRow: {
+    flexDirection: "row",
+    alignItems: "center",
+
+    marginTop: 3,
+  },
+
+  onlineDot: {
+    width: 7,
+    height: 7,
+
+    borderRadius: 4,
+
+    backgroundColor: "#5CCFA7",
+
+    marginRight: 5,
+  },
+
+  onlineText: {
+    fontSize: 11,
+
+    color: "#5C9D83",
+  },
+
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+
+    flexShrink: 0,
+
+    gap: 2,
+  },
+
+  actionButton: {
+    width: 40,
+    height: 40,
+
+    borderRadius: 20,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: "rgba(255,255,255,0.80)",
+  },
+
+  // ==========================================================
   // MESSAGES
-  // =========================
+  // ==========================================================
+
+  messagesArea: {
+    flex: 1,
+  },
 
   messages: {
     flex: 1,
   },
 
   messagesContent: {
-    paddingHorizontal: 17,
-    paddingVertical: 20,
-
-    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 20,
   },
 
   messageRow: {
     width: "100%",
+
+    marginBottom: 12,
+
     flexDirection: "row",
   },
 
-  myRow: {
+  myMessageRow: {
     justifyContent: "flex-end",
   },
 
-  otherRow: {
+  theirMessageRow: {
     justifyContent: "flex-start",
   },
 
   bubble: {
     maxWidth: "78%",
-    paddingHorizontal: 15,
-    paddingVertical: 10,
 
-    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingTop: 11,
+    paddingBottom: 7,
+
+    borderRadius: 19,
   },
 
   myBubble: {
@@ -505,140 +749,192 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 5,
   },
 
-  otherBubble: {
-    backgroundColor:
-      "rgba(255,255,255,0.9)",
+  theirBubble: {
+    backgroundColor: "rgba(255,255,255,0.92)",
 
     borderBottomLeftRadius: 5,
+
+    borderWidth: 1,
+    borderColor: "rgba(120,130,170,0.12)",
   },
 
   messageText: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+
+    lineHeight: 21,
   },
 
-  myText: {
+  myMessageText: {
     color: "#FFFFFF",
   },
 
-  otherText: {
+  theirMessageText: {
     color: "#27345F",
   },
 
-  messageMeta: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-
-    marginTop: 4,
-    gap: 3,
-  },
-
-  time: {
+  messageTime: {
     fontSize: 9,
-    color: "rgba(255,255,255,0.75)",
+
+    marginTop: 5,
+
+    alignSelf: "flex-end",
   },
 
-  // =========================
-  // IMAGE
-  // =========================
+  myMessageTime: {
+    color: "rgba(255,255,255,0.72)",
+  },
+
+  theirMessageTime: {
+    color: "#8992AA",
+  },
+
+  // ==========================================================
+  // IMAGE MESSAGE
+  // ==========================================================
 
   messageImage: {
-    width: 230,
-    height: 230,
+    width: 220,
+    height: 220,
+
+    borderRadius: 12,
+
+    marginBottom: 4,
+
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+
+  // ==========================================================
+  // IMAGE PREVIEW
+  // ==========================================================
+
+  previewContainer: {
+    backgroundColor: "rgba(255,255,255,0.96)",
+
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 12,
+
+    borderTopWidth: 1,
+    borderTopColor: "rgba(120,130,170,0.15)",
+  },
+
+  previewHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+
+    marginBottom: 8,
+  },
+
+  previewTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+
+    color: "#27345F",
+  },
+
+  previewImage: {
+    width: "100%",
+    height: 180,
 
     borderRadius: 14,
 
-    marginBottom: 2,
+    backgroundColor: "#F1F3F8",
   },
 
-  // =========================
-  // INPUT
-  // =========================
+  sendImageButton: {
+    height: 48,
 
-  inputArea: {
-    paddingHorizontal: 14,
-    paddingTop: 8,
-    paddingBottom: Platform.OS === "ios" ? 24 : 12,
+    borderRadius: 24,
 
-    backgroundColor:
-      "rgba(255,255,255,0.72)",
+    marginTop: 10,
 
-    borderTopWidth: 1,
-    borderTopColor:
-      "rgba(120,130,170,0.12)",
-  },
-
-  inputContainer: {
-    minHeight: 54,
+    backgroundColor: "#8A6BE8",
 
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
 
-    borderRadius: 28,
+    gap: 8,
+  },
 
-    paddingLeft: 7,
-    paddingRight: 7,
+  sendImageText: {
+    color: "#FFFFFF",
 
-    backgroundColor:
-      "rgba(255,255,255,0.94)",
+    fontSize: 14,
+    fontWeight: "700",
+  },
 
-    borderWidth: 1,
-    borderColor:
-      "rgba(120,130,170,0.18)",
+  // ==========================================================
+  // INPUT
+  // ==========================================================
 
-    shadowColor: "#7580B5",
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+  inputArea: {
+    minHeight: 68,
+
+    flexDirection: "row",
+    alignItems: "flex-end",
+
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+
+    backgroundColor: "rgba(255,255,255,0.90)",
+
+    borderTopWidth: 1,
+    borderTopColor: "rgba(120,130,170,0.12)",
   },
 
   attachButton: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
+
+    borderRadius: 22,
 
     alignItems: "center",
     justifyContent: "center",
+
+    backgroundColor: "rgba(138,107,232,0.10)",
+
+    marginRight: 8,
   },
 
-  input: {
+  textInput: {
     flex: 1,
 
-    maxHeight: 100,
+    minHeight: 44,
+    maxHeight: 110,
 
-    paddingHorizontal: 8,
-    paddingVertical: 10,
+    borderRadius: 22,
+
+    backgroundColor: "rgba(235,248,249,0.85)",
+
+    borderWidth: 1,
+    borderColor: "rgba(120,130,170,0.18)",
+
+    paddingHorizontal: 17,
+    paddingTop: Platform.OS === "ios" ? 12 : 10,
+    paddingBottom: Platform.OS === "ios" ? 10 : 8,
 
     color: "#27345F",
+
     fontSize: 14,
   },
 
   sendButton: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
 
-    borderRadius: 21,
-
-    backgroundColor: "#8A6BE8",
+    borderRadius: 22,
 
     alignItems: "center",
     justifyContent: "center",
 
-    shadowColor: "#8A6BE8",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 7,
-    elevation: 4,
+    backgroundColor: "#8A6BE8",
+
+    marginLeft: 8,
   },
 
   sendButtonDisabled: {
-    opacity: 0.55,
+    opacity: 0.4,
   },
 });
