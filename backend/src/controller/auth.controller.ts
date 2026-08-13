@@ -3,6 +3,7 @@ import { Message } from "../models/Message.models";
 import { Conversation } from "../models/Conversation.models";
 import { Response,Request } from "express";
 import bcrypt from 'bcrypt'
+import {User} from '../models/User.models'
 
 class  auth  {
     register  = async (req:Request,res:Response)=>{
@@ -20,7 +21,7 @@ class  auth  {
             }
             const password = await bcrypt.hash('oussama',1233) 
 
-            const  
+            const db  =   User.create('User',)  
         }
         catch(err){
             console.error(err)
