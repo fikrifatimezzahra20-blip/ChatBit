@@ -1,9 +1,11 @@
 import { Router } from "express";
-import * as client from '../routes/app'
-const  route =  Router()
+import auth from "../controller/auth.controller";
+import { authenticateToken } from "../middleware/auth.middleware";
 
+const route = Router();
 
-route.post("/api/auth/register",client.register)
-route.post("/api/auth/login")
-route.get("/api/user/me")
-route.get("/api/conversation")
+route.post("/api/auth/register", auth.register);
+route.post("/api/auth/login", auth.login);
+route.get("/api/user/me", authenticateToken, auth.me);
+
+export default route;
