@@ -1,6 +1,5 @@
 import api from "./api";
 import { storage } from "../lib/storage";
-import type { User } from "../types/user";
 
 type RegisterData = {
   fullname: string;
@@ -12,6 +11,14 @@ type RegisterData = {
 type LoginData = {
   email: string;
   password: string;
+};
+
+type User = {
+  id: number;
+  fullname: string;
+  email: string;
+  role: "client" | "agent";
+  is_online?: boolean;
 };
 
 type AuthResponse = {

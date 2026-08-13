@@ -3,7 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 
-import {Alert,Image,Modal,Platform,Pressable,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,} from "react-native";
+import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, } from "react-native";
 
 import ScreenBackground from "../../components/ScreenBackground";
 
@@ -23,13 +23,9 @@ export default function Profile() {
   // --------------------------------
 
   useEffect(() => {
-    // حاليا كنخليو البيانات local.
-    // منين نربطو backend، غادي ناخدو الاسم والصورة من user.
+
   }, []);
 
-  // --------------------------------
-  // Pick image from gallery
-  // --------------------------------
 
   const pickFromGallery = async () => {
     try {
