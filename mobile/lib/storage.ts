@@ -10,30 +10,98 @@ type User = {
   role: "client" | "agent";
 };
 
+// In-memory fallback if native module or localStorage is unavailable
+const memoryStore = new Map<string, string>();
+
+const safeGetItem = async (key: string): Promise<string | null> => {
+  try {
+    const val = await AsyncStorage.getItem(key);
+    if (val !== null && val !== undefined) return val;
+  } catch {
+    // Fall back below if native module is null
+  }
+
+  if (typeof window !== "undefined" && window.localStorage) {
+    try {
+      return window.localStorage.getItem(key);
+    } catch {
+      // ignore
+    }
+  }
+
+  return memoryStore.get(key) || null;
+};
+
+const safeSetItem = async (key: string, value: string): Promise<void> => {
+  let stored = false;
+
+  try {
+    await AsyncStorage.setItem(key, value);
+    stored = true;
+  } catch {
+    // Fall back to web/memory
+  }
+
+  if (typeof window !== "undefined" && window.localStorage) {
+    try {
+      window.localStorage.setItem(key, value);
+      stored = true;
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!stored) {
+    memoryStore.set(key, value);
+  }
+};
+
+const safeRemoveItem = async (key: string): Promise<void> => {
+  try {
+    await AsyncStorage.removeItem(key);
+  } catch {
+    // Fall back to web/memory
+  }
+
+  if (typeof window !== "undefined" && window.localStorage) {
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      // ignore
+    }
+  }
+
+  memoryStore.delete(key);
+};
+
 export const storage = {
-  async getToken() {
-    return await AsyncStorage.getItem(TOKEN_KEY);
+  async getToken(): Promise<string | null> {
+    return await safeGetItem(TOKEN_KEY);
   },
 
-  async setToken(token: string) {
-    await AsyncStorage.setItem(TOKEN_KEY, token);
+  async setToken(token: string): Promise<void> {
+    await safeSetItem(TOKEN_KEY, token);
   },
 
-  async removeToken() {
-    await AsyncStorage.removeItem(TOKEN_KEY);
+  async removeToken(): Promise<void> {
+    await safeRemoveItem(TOKEN_KEY);
   },
 
   async getUser(): Promise<User | null> {
-    const user = await AsyncStorage.getItem(USER_KEY);
-
-    return user ? JSON.parse(user) : null;
+    const user = await safeGetItem(USER_KEY);
+    if (!user) return null;
+    try {
+      return JSON.parse(user);
+    } catch {
+      return null;
+    }
   },
 
-  async setUser(user: User) {
-    await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
+  async setUser(user: User): Promise<void> {
+    await safeSetItem(USER_KEY, JSON.stringify(user));
   },
 
-  async removeUser() {
-    await AsyncStorage.removeItem(USER_KEY);
+  async removeUser(): Promise<void> {
+    await safeRemoveItem(USER_KEY);
   },
 };
