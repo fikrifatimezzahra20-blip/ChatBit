@@ -3,13 +3,28 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 
-import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, } from "react-native";
+import {
+  Alert,
+  Image,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 import ScreenBackground from "../../components/ScreenBackground";
+import { storage } from "../../lib/storage";
+import { getMe, logout } from "../../services/auth.service";
 
-const DEFAULT_NAME = "Fatima Zahra";
+const DEFAULT_NAME = "ChatBit User";
 
 export default function Profile() {
+  const [user, setUser] = useState<any>(null);
   const [name, setName] = useState(DEFAULT_NAME);
   const [editingName, setEditingName] = useState(false);
   const [tempName, setTempName] = useState(DEFAULT_NAME);
@@ -23,9 +38,35 @@ export default function Profile() {
   // --------------------------------
 
   useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const cached = await storage.getUser();
+        if (cached) {
+          setUser(cached);
+          if (cached.fullname) {
+            setName(cached.fullname);
+            setTempName(cached.fullname);
+          }
+        }
+        const fresh = await getMe();
+        if (fresh) {
+          setUser(fresh);
+          if (fresh.fullname) {
+            setName(fresh.fullname);
+            setTempName(fresh.fullname);
+          }
+        }
+      } catch (error) {
+        console.log("Error loading profile:", error);
+      }
+    };
 
+    loadProfile();
   }, []);
 
+  // --------------------------------
+  // Pick image from gallery
+  // --------------------------------
 
   const pickFromGallery = async () => {
     try {
@@ -139,7 +180,8 @@ export default function Profile() {
         {
           text: "Log out",
           style: "destructive",
-          onPress: () => {
+          onPress: async () => {
+            await logout();
             router.replace("/(auth)/login");
           },
         },
@@ -284,7 +326,8 @@ export default function Profile() {
             </View>
 
             <Text style={styles.profileDescription}>
-              Connect, chat and share 🌊
+              {user?.email || "Connect, chat and share 🌊"}
+              {user?.role ? ` • ${user.role.toUpperCase()}` : ""}
             </Text>
 
           </View>
