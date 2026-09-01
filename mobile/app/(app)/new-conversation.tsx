@@ -13,23 +13,43 @@ import {
 
 import ScreenBackground from "../../components/ScreenBackground";
 
+import { createConversation } from "../../services/conversation.service";
+import { queryClient } from "../../lib/queryClient";
+import { Alert, ActivityIndicator } from "react-native";
+
 export default function NewConversation() {
   const [subject, setSubject] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleStart = () => {
+  const handleStart = async () => {
     const cleanSubject = subject.trim();
 
     if (!cleanSubject) {
+      Alert.alert("Required", "Please enter a subject for the conversation.");
       return;
     }
 
-    router.push({
-      pathname: "/(app)/chat/[id]",
-      params: {
-        id: "1",
-        subject: cleanSubject,
-      },
-    });
+    try {
+      setLoading(true);
+      const res = await createConversation({ subject: cleanSubject });
+      await queryClient.invalidateQueries({ queryKey: ["conversations"] });
+
+      router.replace({
+        pathname: "/(app)/chat/[id]",
+        params: {
+          id: String(res.id),
+          subject: res.subject,
+        },
+      });
+    } catch (error: any) {
+      console.log("Create conversation error:", error);
+      const message =
+        error?.response?.data?.message ||
+        "Could not create conversation. Please try again.";
+      Alert.alert("Creation Failed", message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -103,21 +123,26 @@ export default function NewConversation() {
             <TouchableOpacity
               style={[
                 styles.button,
-                !subject.trim() && styles.buttonDisabled,
+                (!subject.trim() || loading) && styles.buttonDisabled,
               ]}
               onPress={handleStart}
               activeOpacity={0.85}
-              disabled={!subject.trim()}
+              disabled={!subject.trim() || loading}
             >
-              <Text style={styles.buttonText}>
-                Start Conversation
-              </Text>
-
-              <Ionicons
-                name="arrow-forward"
-                size={20}
-                color="#FFFFFF"
-              />
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Text style={styles.buttonText}>
+                    Start Conversation
+                  </Text>
+                  <Ionicons
+                    name="arrow-forward"
+                    size={20}
+                    color="#FFFFFF"
+                  />
+                </>
+              )}
             </TouchableOpacity>
 
           </View>

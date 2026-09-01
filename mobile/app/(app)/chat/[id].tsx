@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   Alert,
   Image,
@@ -20,6 +20,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import ScreenBackground from "../../../components/ScreenBackground";
+import TypingIndicator from "../../../components/TypingIndicator";
+import socket from "../../../services/socket";
+import { storage } from "../../../lib/storage";
+import { getMessages } from "../../../services/message.service";
 
 type Message = {
   id: string;
@@ -45,17 +49,94 @@ export default function ChatScreen() {
   const phoneNumber = params.phone || "";
 
   const [message, setMessage] = useState("");
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isOtherTyping, setIsOtherTyping] = useState(false);
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      text: "Hello! 👋 How can we help you today?",
-      mine: false,
-      time: "10:30",
-    },
-  ]);
-
+  const [messages, setMessages] = useState<Message[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+  const convId = Number(params.id);
+
+  // Initialize chat, load history, connect socket
+  useEffect(() => {
+    let isMounted = true;
+
+    const initChat = async () => {
+      const user = await storage.getUser();
+      if (isMounted) setCurrentUser(user);
+
+      if (convId) {
+        try {
+          const res = await getMessages(convId);
+          if (isMounted && res.messages && res.messages.length > 0) {
+            const mapped: Message[] = res.messages.map((m: any) => ({
+              id: String(m.id),
+              text: m.content,
+              mine: user ? m.senderid === user.id || m.sender_id === user.id : false,
+              time: getCurrentTime(m.sentat || m.sent_at),
+            }));
+            setMessages(mapped);
+          }
+        } catch (e) {
+          console.log("Could not load message history:", e);
+        }
+
+        // Connect socket & join room
+        if (!socket.connected) {
+          socket.connect();
+        }
+        socket.emit("conversation:join", { conversationId: convId });
+      }
+    };
+
+    initChat();
+
+    const handleNewMessage = (newMsg: any) => {
+      if (!newMsg) return;
+      const msgConvId = Number(newMsg.conversationid || newMsg.conversation_id);
+      if (msgConvId === convId) {
+        setMessages((previous) => {
+          // Avoid duplicate if already present (e.g. from optimistic send)
+          const alreadyExists = previous.some(
+            (m) => m.id === String(newMsg.id) || (m.text === newMsg.content && m.mine)
+          );
+          if (alreadyExists) return previous;
+
+          return [
+            ...previous,
+            {
+              id: String(newMsg.id),
+              text: newMsg.content,
+              mine: currentUser ? newMsg.senderid === currentUser.id || newMsg.sender_id === currentUser.id : false,
+              time: getCurrentTime(newMsg.sentat || newMsg.sent_at),
+            },
+          ];
+        });
+
+        setTimeout(() => {
+          scrollRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    };
+
+    const handleTypingUpdate = (data: any) => {
+      if (Number(data?.conversationId) === convId && (!currentUser || data.userId !== currentUser.id)) {
+        setIsOtherTyping(data.isTyping);
+      }
+    };
+
+    socket.on("message:new", handleNewMessage);
+    socket.on("typing:update", handleTypingUpdate);
+
+    return () => {
+      isMounted = false;
+      if (convId) {
+        socket.emit("conversation:leave", { conversationId: convId });
+      }
+      socket.off("message:new", handleNewMessage);
+      socket.off("typing:update", handleTypingUpdate);
+    };
+  }, [params.id]);
 
   // =========================
   // SEND TEXT MESSAGE
@@ -63,27 +144,46 @@ export default function ChatScreen() {
 
   const sendMessage = () => {
     const text = message.trim();
-
-    if (!text) {
-      return;
-    }
+    if (!text) return;
 
     const newMessage: Message = {
-      id: Date.now().toString(),
+      id: "temp_" + Date.now(),
       text,
       mine: true,
       time: getCurrentTime(),
     };
 
     setMessages((previous) => [...previous, newMessage]);
-
     setMessage("");
+
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    if (convId) {
+      socket.emit("message:send", {
+        conversationId: convId,
+        content: text,
+      });
+      socket.emit("typing:stop", { conversationId: convId });
+    }
 
     setTimeout(() => {
       scrollRef.current?.scrollToEnd({
         animated: true,
       });
     }, 100);
+  };
+
+  const handleTextChange = (text: string) => {
+    setMessage(text);
+    if (!convId) return;
+
+    if (text.length > 0) {
+      socket.emit("typing:start", { conversationId: convId });
+    } else {
+      socket.emit("typing:stop", { conversationId: convId });
+    }
   };
 
   // =========================
@@ -415,6 +515,7 @@ export default function ChatScreen() {
                 </View>
               ))}
 
+              {isOtherTyping && <TypingIndicator />}
             </ScrollView>
           </Pressable>
 
@@ -497,7 +598,7 @@ export default function ChatScreen() {
               <TextInput
                 style={styles.textInput}
                 value={message}
-                onChangeText={setMessage}
+                onChangeText={handleTextChange}
                 placeholder="Type a message..."
                 placeholderTextColor="#8992AA"
                 multiline
@@ -538,8 +639,9 @@ export default function ChatScreen() {
 // TIME
 // ============================================================
 
-function getCurrentTime() {
-  return new Date().toLocaleTimeString([], {
+function getCurrentTime(date?: string | Date) {
+  const d = date ? new Date(date) : new Date();
+  return d.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });

@@ -1,7 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import {
+  ActivityIndicator,
+  FlatList,
   Image,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -9,27 +12,35 @@ import {
 } from "react-native";
 
 import ScreenBackground from "../../components/ScreenBackground";
+import ConversationItem from "../../components/ConversationItem";
+import { useConversations } from "../../hooks/useConversations";
+import { logout } from "../../services/auth.service";
 
 export default function Conversations() {
+  const { data: conversations = [], isLoading, isRefetching, refetch } = useConversations();
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace("/");
+  };
+
   return (
     <ScreenBackground type="chat">
       <View style={styles.container}>
-
         {/* Header */}
         <View style={styles.header}>
-
           {/* Profile */}
-        <TouchableOpacity
-        style={styles.profileButton}
-        onPress={() => router.push("/(app)/profile")}
-        activeOpacity={0.7}
-        >
-          <Ionicons
-            name="person-outline"
-            size={24}
-            color="#7C5CE6"
-          />
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.profileButton}
+            onPress={() => router.push("/(app)/profile")}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="person-outline"
+              size={24}
+              color="#7C5CE6"
+            />
+          </TouchableOpacity>
 
           {/* Logo */}
           <Image
@@ -41,7 +52,7 @@ export default function Conversations() {
           {/* Logout */}
           <TouchableOpacity
             style={styles.logoutButton}
-            onPress={() => router.replace("/")}
+            onPress={handleLogout}
             activeOpacity={0.8}
           >
             <Ionicons
@@ -50,58 +61,98 @@ export default function Conversations() {
               color="#27345F"
             />
           </TouchableOpacity>
-
         </View>
 
-        {/* Title */}
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>
-            Conversations
-          </Text>
-
-          <Text style={styles.subtitle}>
-            Your conversations in one place
-          </Text>
-        </View>
-
-        {/* Empty state */}
-        <View style={styles.emptyContainer}>
-
-          <View style={styles.iconCircle}>
-            <Ionicons
-              name="chatbubbles-outline"
-              size={45}
-              color="#8A6BE8"
-            />
+        {/* Title and New Action */}
+        <View style={styles.titleRow}>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>Conversations</Text>
+            <Text style={styles.subtitle}>Your conversations in one place</Text>
           </View>
 
-          <Text style={styles.emptyTitle}>
-            No conversations yet
-          </Text>
-
-          <Text style={styles.emptyText}>
-            Start a new conversation with our support team.
-          </Text>
-
-          {/* New conversation */}
           <TouchableOpacity
-            style={styles.newButton}
+            style={styles.addButton}
             onPress={() => router.push("/(app)/new-conversation")}
-            activeOpacity={0.85}
+            activeOpacity={0.8}
           >
-            <Ionicons
-              name="chatbubble-ellipses-outline"
-              size={20}
-              color="#FFFFFF"
-            />
-
-            <Text style={styles.newButtonText}>
-              New Conversation
-            </Text>
+            <Ionicons name="add" size={24} color="#FFFFFF" />
           </TouchableOpacity>
-
         </View>
 
+        {/* List or Loading or Empty state */}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#8A6BE8" />
+          </View>
+        ) : conversations.length > 0 ? (
+          <FlatList
+            data={conversations}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#8A6BE8" />
+            }
+            renderItem={({ item }) => {
+              const dateStr = item.createdat || (item as any).created_at;
+              const time = dateStr
+                ? new Date(dateStr).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                : "";
+
+              let statusText = "Pending agent";
+              if (item.status === "en_cours") statusText = "Active conversation";
+              if ((item.status as string) === "closed" || item.status === "fermee") statusText = "Closed";
+
+              return (
+                <ConversationItem
+                  subject={item.subject}
+                  lastMessage={statusText}
+                  time={time}
+                  online={item.status === "en_cours"}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(app)/chat/[id]",
+                      params: {
+                        id: String(item.id),
+                        name: item.subject,
+                      },
+                    })
+                  }
+                />
+              );
+            }}
+          />
+        ) : (
+          <View style={styles.emptyContainer}>
+            <View style={styles.iconCircle}>
+              <Ionicons
+                name="chatbubbles-outline"
+                size={45}
+                color="#8A6BE8"
+              />
+            </View>
+
+            <Text style={styles.emptyTitle}>No conversations yet</Text>
+
+            <Text style={styles.emptyText}>
+              Start a new conversation with our support team.
+            </Text>
+
+            {/* New conversation */}
+            <TouchableOpacity
+              style={styles.newButton}
+              onPress={() => router.push("/(app)/new-conversation")}
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={20}
+                color="#FFFFFF"
+              />
+              <Text style={styles.newButtonText}>New Conversation</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </ScreenBackground>
   );
@@ -113,14 +164,12 @@ const styles = StyleSheet.create({
     paddingTop: 45,
     paddingHorizontal: 22,
   },
-
   header: {
     height: 65,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-
   profileButton: {
     width: 44,
     height: 44,
@@ -129,21 +178,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
-  profileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#EEE9FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
   logo: {
     width: 125,
     height: 65,
   },
-
   logoutButton: {
     width: 44,
     height: 44,
@@ -152,80 +190,93 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
-  titleContainer: {
-    marginTop: 30,
-    marginBottom: 25,
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 20,
+    marginBottom: 20,
   },
-
+  titleContainer: {
+    flex: 1,
+  },
+  addButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#8A6BE8",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#8A6BE8",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
   title: {
-    fontSize: 29,
+    fontSize: 28,
     fontWeight: "700",
     color: "#27345F",
   },
-
   subtitle: {
-    marginTop: 6,
+    marginTop: 4,
     fontSize: 14,
     color: "#737B94",
   },
-
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  listContent: {
+    paddingBottom: 40,
+  },
   emptyContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingBottom: 100,
+    paddingBottom: 80,
   },
-
   iconCircle: {
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: "rgba(238,233,255,0.9)",
+    backgroundColor: "rgba(138,107,232,0.12)",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 22,
+    marginBottom: 20,
   },
-
   emptyTitle: {
-    fontSize: 21,
+    fontSize: 20,
     fontWeight: "700",
     color: "#27345F",
     marginBottom: 8,
   },
-
   emptyText: {
     fontSize: 14,
     color: "#737B94",
     textAlign: "center",
-    lineHeight: 21,
-    maxWidth: 280,
+    maxWidth: 260,
+    lineHeight: 20,
     marginBottom: 25,
   },
-
   newButton: {
-    height: 54,
-    paddingHorizontal: 25,
-    borderRadius: 27,
-    backgroundColor: "#8A6BE8",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 9,
-
+    backgroundColor: "#8A6BE8",
+    paddingVertical: 14,
+    paddingHorizontal: 22,
+    borderRadius: 25,
+    gap: 8,
     shadowColor: "#8A6BE8",
-    shadowOffset: {
-      width: 0,
-      height: 7,
-    },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 6,
+    shadowRadius: 8,
+    elevation: 4,
   },
-
   newButtonText: {
     color: "#FFFFFF",
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "600",
   },
 });
