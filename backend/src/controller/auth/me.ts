@@ -14,14 +14,18 @@ export const me = async (req: Request, res: Response) => {
             return res.status(404).json({ message: "User not found" });
         }
 
+        const userData = {
+            id: user.id,
+            fullname: user.fullname,
+            email: user.email,
+            role: user.role,
+            is_online: user.is_online,
+            isonline: user.is_online
+        };
+
         return res.status(200).json({
-            user: {
-                id: user.id,
-                fullname: user.fullname,
-                email: user.email,
-                role: user.role,
-                is_online: user.is_online
-            }
+            ...userData,
+            user: userData
         });
     } catch (err) {
         console.error(err);

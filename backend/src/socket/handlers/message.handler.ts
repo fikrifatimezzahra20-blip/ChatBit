@@ -19,18 +19,25 @@ export const handleMessage = (io: Server, socket: Socket) => {
                 return;
             }
 
+            const role = user.role?.toUpperCase();
+
             // Verify participant permission
-            if (user.role === "CLIENT" && conversation.client_id !== user.id) {
+            if (role === "CLIENT" && conversation.client_id !== user.id) {
                 socket.emit("error", { message: "Unauthorized to send message to this conversation" });
                 return;
             }
-            if (user.role === "AGENT" && conversation.agent_id !== user.id) {
-                socket.emit("error", { message: "Unauthorized to send message to this conversation" });
-                return;
+            if (role === "AGENT") {
+                if (conversation.agent_id === null) {
+                    await conversation.update({ agent_id: user.id, status: "en_cours" });
+                    io.emit("conversation:updated", conversation);
+                } else if (conversation.agent_id !== user.id) {
+                    socket.emit("error", { message: "Unauthorized to send message to this conversation" });
+                    return;
+                }
             }
 
             // Verify if conversation is already closed
-            if (conversation.status === "closed") {
+            if (conversation.status === "closed" || conversation.status === "fermee") {
                 socket.emit("error", { message: "Cannot send message: Conversation is closed" });
                 return;
             }
@@ -48,12 +55,21 @@ export const handleMessage = (io: Server, socket: Socket) => {
                 include: [
                     { model: User, as: "sender", attributes: ["id", "fullname", "email", "role"] }
                 ]
-            });
+            }) as any;
+
+            const msgJson = populatedMessage?.toJSON ? populatedMessage.toJSON() : (newMessage.toJSON ? newMessage.toJSON() : newMessage);
+            const formatted = {
+                ...msgJson,
+                conversationid: msgJson.conversation_id,
+                senderid: msgJson.sender_id,
+                isread: msgJson.is_read,
+                sentat: msgJson.sent_at
+            };
 
             // Broadcast to room
-            io.to(`conversation_${conversationId}`).emit("message:new", populatedMessage);
+            io.to(`conversation_${conversationId}`).emit("message:new", formatted);
         } catch (err) {
-            console.error(err);
+            console.error("Error in message:send:", err);
             socket.emit("error", { message: "Error sending message" });
         }
     });
