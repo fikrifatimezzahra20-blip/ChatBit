@@ -22,6 +22,8 @@ const errorHandler = (
     message,
   });
 };
-const asyncHandler = (fn:Function)=>(req:Request , res:Response , next:NextFunction )=>{}
+const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
 
 export { AppError, errorHandler, asyncHandler };

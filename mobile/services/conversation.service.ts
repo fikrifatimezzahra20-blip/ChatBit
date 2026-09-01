@@ -17,7 +17,9 @@ type CreateConversationData = {
 export const getConversations = async (): Promise<Conversation[]> => {
   const response = await api.get("/conversations");
 
-  return response.data;
+  return Array.isArray(response.data)
+    ? response.data
+    : (response.data?.conversations || []);
 };
 
 export const createConversation = async (
@@ -25,7 +27,7 @@ export const createConversation = async (
 ): Promise<Conversation> => {
   const response = await api.post("/conversations", data);
 
-  return response.data;
+  return response.data?.conversation || response.data;
 };
 
 export const closeConversation = async (
@@ -35,5 +37,5 @@ export const closeConversation = async (
     `/conversations/${conversationId}/close`
   );
 
-  return response.data;
+  return response.data?.conversation || response.data;
 };

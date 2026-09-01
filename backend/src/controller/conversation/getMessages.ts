@@ -19,19 +19,23 @@ export const getMessages = async (req: Request, res: Response) => {
             return res.status(404).json({ message: "Conversation not found" });
         }
 
+        const role = user.role?.toUpperCase();
         // Verify membership: user must be client or agent of this conversation (or if agent and conversation is unassigned)
-        if (user.role === "CLIENT" && conversation.client_id !== user.id) {
+        if (role === "CLIENT" && conversation.client_id !== user.id) {
             return res.status(403).json({ message: "Forbidden: You are not a participant in this conversation" });
         }
-        if (user.role === "AGENT" && conversation.agent_id !== null && conversation.agent_id !== user.id) {
+        if (role === "AGENT" && conversation.agent_id !== null && conversation.agent_id !== user.id) {
             return res.status(403).json({ message: "Forbidden: Conversation is assigned to another agent" });
         }
 
         // Pagination query params
-        const limit = parseInt(req.query.limit as string) || 20;
-        const offset = parseInt(req.query.offset as string) || 0;
+        const limit = parseInt(req.query.limit as string) || 50;
+        const page = parseInt(req.query.page as string) || 1;
+        const offset = req.query.offset !== undefined
+            ? parseInt(req.query.offset as string)
+            : (page - 1) * limit;
 
-        const { count, rows: messages } = await Message.findAndCountAll({
+        const { count, rows: rawMessages } = await Message.findAndCountAll({
             where: { conversation_id: id },
             order: [["sent_at", "DESC"]],
             limit,
@@ -41,11 +45,23 @@ export const getMessages = async (req: Request, res: Response) => {
             ]
         });
 
+        const messages = rawMessages.reverse().map((m: any) => {
+            const item = m.toJSON ? m.toJSON() : m;
+            return {
+                ...item,
+                conversationid: item.conversation_id,
+                senderid: item.sender_id,
+                isread: item.is_read,
+                sentat: item.sent_at
+            };
+        });
+
         return res.status(200).json({
             total: count,
             limit,
+            page,
             offset,
-            messages: messages.reverse() // Return in chronological order
+            messages
         });
     } catch (err) {
         console.error(err);

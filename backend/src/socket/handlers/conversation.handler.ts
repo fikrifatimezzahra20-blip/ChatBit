@@ -16,18 +16,20 @@ export const handleConversation = (io: Server, socket: Socket) => {
                 return;
             }
 
+            const role = user.role?.toUpperCase();
+
             // Verify membership: client must be the owner, agent must be the owner or unassigned
-            if (user.role === "CLIENT" && conversation.client_id !== user.id) {
+            if (role === "CLIENT" && conversation.client_id !== user.id) {
                 socket.emit("error", { message: "Unauthorized room access" });
                 return;
             }
-            if (user.role === "AGENT" && conversation.agent_id !== null && conversation.agent_id !== user.id) {
+            if (role === "AGENT" && conversation.agent_id !== null && conversation.agent_id !== user.id) {
                 socket.emit("error", { message: "Unauthorized room access" });
                 return;
             }
 
             // Agent joining an unassigned (en_attente) conversation automatically assigns them
-            if (user.role === "AGENT" && conversation.status === "en_attente") {
+            if (role === "AGENT" && conversation.status === "en_attente") {
                 await conversation.update({
                     status: "en_cours",
                     agent_id: user.id

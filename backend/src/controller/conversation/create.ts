@@ -9,25 +9,42 @@ export const create = async (req: Request, res: Response) => {
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        if (user.role !== "CLIENT") {
+        const role = user.role?.toUpperCase();
+        if (role !== "CLIENT") {
             return res.status(403).json({ message: "Only clients can create conversations" });
         }
 
         const { subject } = req.body;
-        if (!subject) {
+        if (!subject || !subject.trim()) {
             return res.status(400).json({ message: "Subject is required" });
         }
 
         const newConversation = await Conversation.create({
-            subject,
+            subject: subject.trim(),
             status: "en_attente",
             client_id: user.id,
             agent_id: null
-        });
+        }) as any;
+
+        const convJson = newConversation.toJSON ? newConversation.toJSON() : newConversation;
+        const formatted = {
+            ...convJson,
+            clientid: convJson.client_id,
+            agentid: convJson.agent_id,
+            createdat: convJson.created_at,
+            closedat: convJson.closed_at
+        };
+
+        // Notify agents via socket in real time
+        const io = req.app.get("io");
+        if (io) {
+            io.emit("conversation:new", formatted);
+        }
 
         return res.status(201).json({
             message: "Conversation created successfully",
-            conversation: newConversation
+            ...formatted,
+            conversation: formatted
         });
     } catch (err) {
         console.error(err);

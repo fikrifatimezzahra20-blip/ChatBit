@@ -9,7 +9,8 @@ export const close = async (req: Request, res: Response) => {
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        if (user.role !== "AGENT") {
+        const role = user.role?.toUpperCase();
+        if (role !== "AGENT") {
             return res.status(403).json({ message: "Forbidden: Only agents can close conversations" });
         }
 
@@ -33,15 +34,26 @@ export const close = async (req: Request, res: Response) => {
             agent_id: conversation.agent_id || user.id // Assign to current agent if not already assigned
         });
 
+        const convJson = conversation.toJSON ? conversation.toJSON() : conversation;
+        const formatted = {
+            ...convJson,
+            clientid: convJson.client_id,
+            agentid: convJson.agent_id,
+            createdat: convJson.created_at,
+            closedat: convJson.closed_at
+        };
+
         // Broadcast real-time event if Socket.IO is initialized
         const io = req.app.get("io");
         if (io) {
-            io.to(`conversation_${id}`).emit("conversation:updated", conversation);
+            io.to(`conversation_${id}`).emit("conversation:updated", formatted);
+            io.emit("conversation:updated", formatted);
         }
 
         return res.status(200).json({
             message: "Conversation closed successfully",
-            conversation
+            ...formatted,
+            conversation: formatted
         });
     } catch (err) {
         console.error(err);
